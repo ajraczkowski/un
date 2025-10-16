@@ -40,7 +40,7 @@
             <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,8,8,10">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
                     <Ellipse x:Name="Player2TurnIndicator" Width="12" Height="12" Fill="Transparent" Margin="0,0,8,0" />
-                    <TextBlock x:Name="Player2Label" Text="Alice (0 cards)" FontWeight="Bold" Foreground="White" />
+                    <TextBlock x:Name="Player2Label" Text="Player 2 (0 cards)" FontWeight="Bold" Foreground="White" />
                 </StackPanel>
                 <ItemsControl x:Name="Player2HandDisplay" MinHeight="80">
                     <ItemsControl.ItemsPanel>
@@ -55,7 +55,7 @@
         <StackPanel Grid.Row="1" Grid.Column="0" Margin="8,8,10,8">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
                 <Ellipse x:Name="Player3TurnIndicator" Width="12" Height="12" Fill="Transparent" Margin="0,0,8,0" />
-                <TextBlock x:Name="Player3Label" Text="Bob (0 cards)" FontWeight="Bold" Foreground="White" />
+                <TextBlock x:Name="Player3Label" Text="Player 3 (0 cards)" FontWeight="Bold" Foreground="White" />
             </StackPanel>
                 <ItemsControl x:Name="Player3HandDisplay" MinWidth="150">
                     <ItemsControl.ItemsPanel>
@@ -70,29 +70,15 @@
         <StackPanel Grid.Row="1" Grid.Column="1" Margin="8" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel Margin="0,0,20,0">
                 <TextBlock x:Name="StockPileLabel" Text="Stock Pile" FontWeight="Bold" Margin="0,0,0,8" HorizontalAlignment="Center" Foreground="White" />
-                <Border Width="100" Height="140" CornerRadius="4" BorderBrush="Black" BorderThickness="2" Background="Black" Cursor="Hand" MouseLeftButtonDown="StockPile_Click">
-                    <Border x:Name="StockPileDisplay" BorderBrush="White" BorderThickness="4" CornerRadius="2" Background="Black">
-                        <TextBlock Text="UN" FontSize="36" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                <Border x:Name="StockPileContainer" Width="100" Height="140" Cursor="Hand" MouseLeftButtonDown="StockPile_Click">
+                    <!-- SVG will be rendered here -->
                 </Border>
             </StackPanel>
                 
             <StackPanel>
                 <TextBlock Text="Discard Pile" FontWeight="Bold" Margin="0,0,0,8" HorizontalAlignment="Center" Foreground="White" />
-                <Border Width="100" Height="140" CornerRadius="4" BorderBrush="Black" BorderThickness="2">
-                    <Border x:Name="DiscardPileDisplay" BorderBrush="White" BorderThickness="4" CornerRadius="2" Background="LightGray">
-                        <Grid>
-                            <!-- Color indicator for Wild cards -->
-                            <Border x:Name="WildColorIndicator" Width="84" Height="22" CornerRadius="2" 
-                                    HorizontalAlignment="Center" VerticalAlignment="Bottom" 
-                                    Margin="0,0,0,5" Visibility="Collapsed">
-                                <TextBlock x:Name="WildColorText" FontSize="10" FontWeight="Bold" 
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" 
-                                           Foreground="White" />
-                            </Border>
-                            <TextBlock x:Name="DiscardCenter" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Grid>
-                    </Border>
+                <Border x:Name="DiscardPileContainer" Width="100" Height="140">
+                    <!-- SVG will be rendered here -->
                 </Border>
             </StackPanel>
         </StackPanel>
@@ -101,7 +87,7 @@
         <StackPanel Grid.Row="1" Grid.Column="2" Margin="10,8,8,8">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
                 <Ellipse x:Name="Player4TurnIndicator" Width="12" Height="12" Fill="Transparent" Margin="0,0,8,0" />
-                <TextBlock x:Name="Player4Label" Text="Charlie (0 cards)" FontWeight="Bold" Foreground="White" />
+                <TextBlock x:Name="Player4Label" Text="Player 4 (0 cards)" FontWeight="Bold" Foreground="White" />
             </StackPanel>
                 <ItemsControl x:Name="Player4HandDisplay" MinWidth="150">
                     <ItemsControl.ItemsPanel>

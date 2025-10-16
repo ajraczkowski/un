@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="300" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer black border -->
+  <rect width="200" height="300" rx="15" fill="#000000"/>
+  
+  <!-- White border -->
+  <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
+  
+  <!-- Card Background - Black -->
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#000000"/>
+  
+  <!-- Decorative Border -->
+  <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  
+  <!-- Four colored quadrants in a circle -->
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#FFFFFF" flood-opacity="0.3"/>
+    </filter>
+    <clipPath id="topLeft">
+      <path d="M 100 130 L 100 80 A 50 50 0 0 1 135.355 94.645 Z"/>
+    </clipPath>
+    <clipPath id="topRight">
+      <path d="M 100 130 L 135.355 94.645 A 50 50 0 0 1 150 130 Z"/>
+    </clipPath>
+    <clipPath id="bottomRight">
+      <path d="M 100 130 L 150 130 A 50 50 0 0 1 135.355 165.355 Z"/>
+    </clipPath>
+    <clipPath id="bottomLeft">
+      <path d="M 100 130 L 135.355 165.355 A 50 50 0 0 1 100 180 Z"/>
+    </clipPath>
+  </defs>
+  
+  <g filter="url(#shadow)">
+    <!-- Outer circle border -->
+    <circle cx="100" cy="130" r="50" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+    
+    <!-- Red quadrant (top-left) -->
+    <circle cx="100" cy="130" r="50" fill="#E63946" clip-path="url(#topLeft)"/>
+    
+    <!-- Blue quadrant (top-right) -->
+    <circle cx="100" cy="130" r="50" fill="#1E88E5" clip-path="url(#topRight)"/>
+    
+    <!-- Yellow quadrant (bottom-right) -->
+    <circle cx="100" cy="130" r="50" fill="#FDD835" clip-path="url(#bottomRight)"/>
+    
+    <!-- Green quadrant (bottom-left) -->
+    <circle cx="100" cy="130" r="50" fill="#43A047" clip-path="url(#bottomLeft)"/>
+    
+    <!-- Center "+4" text -->
+    <circle cx="100" cy="130" r="25" fill="#000000"/>
+    <text x="100" y="143" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+          fill="#FFFFFF" text-anchor="middle">+4</text>
+  </g>
+  
+  <!-- "WILD" text -->
+  <text x="100" y="220" font-family="Arial, sans-serif" font-size="32" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="middle" filter="url(#shadow)">WILD</text>
+  
+  <!-- "DRAW 4" text -->
+  <text x="100" y="250" font-family="Arial, sans-serif" font-size="24" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="middle" filter="url(#shadow)">DRAW 4</text>
+  
+  <!-- Corner wild symbols with +4 -->
+  <g>
+    <!-- Top-left corner -->
+    <circle cx="30" cy="35" r="10" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+    <path d="M 30 35 L 30 25 A 10 10 0 0 1 37.071 27.929 Z" fill="#E63946"/>
+    <path d="M 30 35 L 37.071 27.929 A 10 10 0 0 1 40 35 Z" fill="#1E88E5"/>
+    <path d="M 30 35 L 40 35 A 10 10 0 0 1 37.071 42.071 Z" fill="#FDD835"/>
+    <path d="M 30 35 L 37.071 42.071 A 10 10 0 0 1 30 45 Z" fill="#43A047"/>
+    <text x="30" y="55" font-family="Arial, sans-serif" font-size="10" font-weight="bold" 
+          fill="#FFFFFF" text-anchor="middle">+4</text>
+  </g>
+  
+  <g transform="rotate(180 170 270)">
+    <!-- Bottom-right corner (rotated) -->
+    <circle cx="170" cy="270" r="10" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+    <path d="M 170 270 L 170 260 A 10 10 0 0 1 177.071 262.929 Z" fill="#E63946"/>
+    <path d="M 170 270 L 177.071 262.929 A 10 10 0 0 1 180 270 Z" fill="#1E88E5"/>
+    <path d="M 170 270 L 180 270 A 10 10 0 0 1 177.071 277.071 Z" fill="#FDD835"/>
+    <path d="M 170 270 L 177.071 277.071 A 10 10 0 0 1 170 280 Z" fill="#43A047"/>
+    <text x="170" y="290" font-family="Arial, sans-serif" font-size="10" font-weight="bold" 
+          fill="#FFFFFF" text-anchor="middle">+4</text>
+  </g>
+</svg>

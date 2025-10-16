@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="300" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer black border -->
+  <rect width="200" height="300" rx="15" fill="#000000"/>
+  
+  <!-- White border -->
+  <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
+  
+  <!-- Card Background - Green -->
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#43A047"/>
+  
+  <!-- Decorative Border -->
+  <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  
+  <!-- Reverse Icon -->
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Circular arrows symbol for Reverse -->
+  <g filter="url(#shadow)">
+    <!-- Outer circle -->
+    <circle cx="100" cy="150" r="50" fill="none" stroke="#FFFFFF" stroke-width="6"/>
+    
+    <!-- Clockwise arrow (right side) -->
+    <path d="M 150 150 Q 150 120, 125 105" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="130,95 120,110 140,105" fill="#FFFFFF"/>
+    
+    <!-- Counter-clockwise arrow (left side) -->
+    <path d="M 50 150 Q 50 180, 75 195" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <polygon points="70,205 80,190 60,195" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- Corner text -->
+  <text x="25" y="50" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="start">Reverse</text>
+  
+  <text x="25" y="50" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="start" transform="rotate(180 100 150)">Reverse</text>
+</svg>

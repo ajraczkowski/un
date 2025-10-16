@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="300" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer black border -->
+  <rect width="200" height="300" rx="15" fill="#000000"/>
+  
+  <!-- White border -->
+  <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
+  
+  <!-- Card Background -->
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#000000"/>
+  
+  <!-- Decorative Border -->
+  <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  
+  <!-- Corner Decorations -->
+  <!-- Top Left -->
+  <circle cx="30" cy="30" r="3" fill="#FFFFFF"/>
+  <path d="M 30 30 Q 25 25, 20 30" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  <path d="M 30 30 Q 25 25, 30 20" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  
+  <!-- Top Right -->
+  <circle cx="170" cy="30" r="3" fill="#FFFFFF"/>
+  <path d="M 170 30 Q 175 25, 180 30" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  <path d="M 170 30 Q 175 25, 170 20" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  
+  <!-- Bottom Left -->
+  <circle cx="30" cy="270" r="3" fill="#FFFFFF"/>
+  <path d="M 30 270 Q 25 275, 20 270" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  <path d="M 30 270 Q 25 275, 30 280" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  
+  <!-- Bottom Right -->
+  <circle cx="170" cy="270" r="3" fill="#FFFFFF"/>
+  <path d="M 170 270 Q 175 275, 180 270" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  <path d="M 170 270 Q 175 275, 170 280" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+  
+  <!-- Main UN Text with Shadow Effect -->
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#FFFFFF" flood-opacity="0.3"/>
+    </filter>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E0E0E0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- UN Text - Centered using text-anchor -->
+  <text x="100" y="170" font-family="Arial, sans-serif" font-size="90" font-weight="bold" 
+        fill="url(#textGradient)" stroke="#FFFFFF" stroke-width="2" 
+        text-anchor="middle" filter="url(#shadow)">UN</text>
+</svg>

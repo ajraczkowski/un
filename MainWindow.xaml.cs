@@ -1,149 +1,88 @@
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Media;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Media;
-using System.IO;
+using Un.Dialogs;
 
 namespace Un
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, IDisposable
     {
         private GameEngine _engine = new GameEngine();
-        private GameState _gameState = new GameState();
         private System.Windows.Controls.Border? _pressedCardBorder;
-        private GameLog _gameLog;
-        private SoundPlayer? _cardPlaySound;
-        private SoundPlayer? _errorSound;
-        private SoundPlayer? _skipSound;
+        private SoundManager _soundManager;
+        private bool _disposed = false;
 
         public MainWindow()
         {
             InitializeComponent();
             
-            // Initialize game log
-            _gameLog = new GameLog(LogScrollViewer, Dispatcher);
-            GameLogDisplay.ItemsSource = _gameLog.Entries;
+            // Subscribe to Closed event to dispose resources
+            Closed += (s, e) => Dispose();
             
             // Set log to be visible by default
             ShowLogMenuItem.IsChecked = true;
             
-            // Load sound effects
-            try
-            {
-                var cardPlayPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sounds", "card_play.wav");
-                var errorPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sounds", "error.wav");
-                var skipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sounds", "skip.wav");
-                
-                if (File.Exists(cardPlayPath))
-                    _cardPlaySound = new SoundPlayer(cardPlayPath);
-                
-                if (File.Exists(errorPath))
-                    _errorSound = new SoundPlayer(errorPath);
-                
-                if (File.Exists(skipPath))
-                    _skipSound = new SoundPlayer(skipPath);
-            }
-            catch
-            {
-                // If sounds fail to load, we'll fall back to system sounds
-            }
+            // Initialize sound manager
+            _soundManager = new SoundManager();
+            
+            // Setup game engine and subscribe to events
+            SetupEngine();
             
             // Start the first game
             StartNewGame();
         }
 
-        private void PlayCardSound()
+        private void SetupEngine()
         {
-            if (_cardPlaySound != null)
-            {
-                _cardPlaySound.Play();
-            }
-            else
-            {
-                SystemSounds.Exclamation.Play();
-            }
+            // Subscribe to game log events for UI updates
+            _engine.Log.LogEntryAdded += GameLog_LogEntryAdded;
+            GameLogDisplay.ItemsSource = _engine.Log.Entries;
         }
 
-        private async System.Threading.Tasks.Task PlayCardSoundAsync()
+        private void GameLog_LogEntryAdded(object? sender, EventArgs e)
         {
-            if (_cardPlaySound != null)
+            // Use Dispatcher to ensure this runs after the UI has updated
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                // Play sound on background thread to not block
-                await System.Threading.Tasks.Task.Run(() => _cardPlaySound.PlaySync());
-            }
-            else
-            {
-                SystemSounds.Exclamation.Play();
-            }
-        }
-
-        private void PlayErrorSound()
-        {
-            if (_errorSound != null)
-            {
-                _errorSound.Play();
-            }
-            else
-            {
-                SystemSounds.Beep.Play();
-            }
-        }
-
-        private void PlaySkipSound()
-        {
-            if (_skipSound != null)
-            {
-                _skipSound.Play();
-            }
-            else
-            {
-                SystemSounds.Asterisk.Play();
-            }
+                // Only auto-scroll if the user is currently at the bottom
+                // This prevents interrupting manual scrolling
+                double tolerance = 5.0; // Small tolerance for floating point comparison
+                bool isAtBottom = LogScrollViewer.VerticalOffset >= 
+                                  LogScrollViewer.ScrollableHeight - tolerance;
+                
+                if (isAtBottom || LogScrollViewer.ScrollableHeight == 0)
+                {
+                    LogScrollViewer.ScrollToBottom();
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void StartNewGame()
         {
             // Reset all game state
             _engine = new GameEngine();
-            _gameState.Reset();
+            SetupEngine(); // Resubscribe to new engine's log events
             _pressedCardBorder = null;
-            _gameLog.Clear();
+            _engine.Log.Clear();
 
-            // Deal 7 cards to each player
-            for (int i = 0; i < 7; i++)
-            {
-                var card1 = _engine.DrawCard();
-                if (card1 != null) _gameState.Player1Hand.Add(card1);
-                
-                var card2 = _engine.DrawCard();
-                if (card2 != null) _gameState.Player2Hand.Add(card2);
-                
-                var card3 = _engine.DrawCard();
-                if (card3 != null) _gameState.Player3Hand.Add(card3);
-                
-                var card4 = _engine.DrawCard();
-                if (card4 != null) _gameState.Player4Hand.Add(card4);
-            }
+            // Deal cards to all players and get the first discard card
+            var firstCard = _engine.DealNewGame();
             
-            // Start discard pile with one card
-            var firstCard = _engine.DrawCard();
             if (firstCard != null)
             {
-                _gameState.DiscardPile.Add(firstCard);
+                _engine.State.DiscardPile.Add(firstCard);
                 
                 // If the first card is a wild card, the first player chooses the color
                 if (firstCard.Type == CardType.Wild || firstCard.Type == CardType.DrawFour)
                 {
-                    _gameState.ChosenWildColor = ChooseWildColor(true); // Human player chooses
-                    _gameLog.LogColorChoice(1, _gameState.ChosenWildColor.Value, " for the starting card");
+                    _engine.State.ChosenWildColor = ChooseWildColor(true); // Human player chooses
+                    _engine.Log.LogColorChoice(1, _engine.State.ChosenWildColor.Value, " for the starting card");
                 }
             }
             
+            // Refresh the UI
             UpdateDeckCount();
             RenderAllPlayers();
+            RenderStockPile();
             RenderDiscardPile();
             UpdateTurnIndicator();
         }
@@ -156,19 +95,12 @@ namespace Un
         private void NewGameMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Check if a game is in progress
-            bool gameInProgress = _gameState.IsGameInProgress();
+            bool gameInProgress = _engine.State.IsGameInProgress();
 
             if (gameInProgress)
             {
                 // Show confirmation dialog
-                var result = MessageBox.Show(
-                    "A game is currently in progress. Are you sure you want to end the current game and start a new one?",
-                    "Confirm New Game",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question,
-                    MessageBoxResult.No);
-
-                if (result != MessageBoxResult.Yes)
+                if (!NewGameConfirmationDialog.Show())
                 {
                     return; // User chose not to start a new game
                 }
@@ -205,73 +137,12 @@ namespace Un
             if (isHumanPlayer)
             {
                 // Show dialog for human player
-                var dialog = new Window
-                {
-                    Title = "Choose Color",
-                    Width = 300,
-                    Height = 280,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Owner = this,
-                    ResizeMode = ResizeMode.NoResize
-                };
-
-                var stack = new System.Windows.Controls.StackPanel
-                {
-                    Margin = new Thickness(20)
-                };
-
-                var label = new System.Windows.Controls.TextBlock
-                {
-                    Text = "Choose a color for the Wild card:",
-                    FontSize = 14,
-                    Margin = new Thickness(0, 0, 0, 15),
-                    TextWrapping = TextWrapping.Wrap
-                };
-                stack.Children.Add(label);
-
-                CardColor? selectedColor = null;
-
-                var colors = new[] { CardColor.Red, CardColor.Blue, CardColor.Green, CardColor.Yellow };
-                foreach (var color in colors)
-                {
-                    var button = new System.Windows.Controls.Button
-                    {
-                        Content = color.ToString(),
-                        Height = 30,
-                        Margin = new Thickness(0, 5, 0, 0),
-                        FontSize = 12,
-                        FontWeight = FontWeights.Bold
-                    };
-
-                    button.Background = color switch
-                    {
-                        CardColor.Red => new SolidColorBrush(Color.FromRgb(220, 20, 60)),      // Crimson
-                        CardColor.Blue => new SolidColorBrush(Color.FromRgb(30, 144, 255)),    // DodgerBlue
-                        CardColor.Green => new SolidColorBrush(Color.FromRgb(50, 205, 50)),    // LimeGreen
-                        CardColor.Yellow => new SolidColorBrush(Color.FromRgb(255, 215, 0)),   // Gold
-                        _ => Brushes.Gray
-                    };
-
-                    var capturedColor = color;
-                    button.Click += (s, e) =>
-                    {
-                        selectedColor = capturedColor;
-                        dialog.DialogResult = true;
-                        dialog.Close();
-                    };
-
-                    stack.Children.Add(button);
-                }
-
-                dialog.Content = stack;
-                dialog.ShowDialog();
-
-                return selectedColor ?? CardColor.Red; // Default to Red if dialog is closed
+                return ColorChoiceDialog.Show(this);
             }
             else
             {
                 // AI chooses a color based on what they have most of
-                var currentHand = _gameState.GetPlayerHand(_gameState.CurrentPlayer);
+                var currentHand = _engine.State.GetPlayerHand(_engine.State.CurrentPlayer);
 
                 // Count colors in hand
                 var colorCounts = new Dictionary<CardColor, int>
@@ -297,77 +168,25 @@ namespace Un
 
         private void CheckForWinner()
         {
-            int winner = _gameState.CheckForWinner();
+            int winner = _engine.State.CheckForWinner();
             
             if (winner != -1)
             {
-                string winnerName = _gameState.GetPlayerName(winner);
+                string winnerName = _engine.State.GetPlayerName(winner);
                 
                 // Log the win
-                _gameLog.LogWin(winner);
+                _engine.Log.LogWin(winner);
                 
-                var result = MessageBox.Show(
-                    $"{winnerName} won the game!\n\nWould you like to play again?",
-                    "Game Over",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
-                
-                if (result == MessageBoxResult.Yes)
+                if (GameOverDialog.Show(winnerName))
                 {
-                    RestartGame();
+                    StartNewGame();
                 }
                 else
                 {
                     // Game is over, disable further moves
-                    _gameState.GameIsOver = true;
+                    _engine.State.GameIsOver = true;
                 }
             }
-        }
-
-        private void RestartGame()
-        {
-            // Reset the engine and create new deck
-            _engine = new GameEngine();
-            
-            // Reset all game state
-            _gameState.Reset();
-            _gameLog.Clear();
-            
-            // Deal 7 cards to each player
-            for (int i = 0; i < 7; i++)
-            {
-                var card1 = _engine.DrawCard();
-                if (card1 != null) _gameState.Player1Hand.Add(card1);
-                
-                var card2 = _engine.DrawCard();
-                if (card2 != null) _gameState.Player2Hand.Add(card2);
-                
-                var card3 = _engine.DrawCard();
-                if (card3 != null) _gameState.Player3Hand.Add(card3);
-                
-                var card4 = _engine.DrawCard();
-                if (card4 != null) _gameState.Player4Hand.Add(card4);
-            }
-            
-            // Start discard pile with one card
-            var firstCard = _engine.DrawCard();
-            if (firstCard != null)
-            {
-                _gameState.DiscardPile.Add(firstCard);
-                
-                // If the first card is a wild card, the first player chooses the color
-                if (firstCard.Type == CardType.Wild || firstCard.Type == CardType.DrawFour)
-                {
-                    _gameState.ChosenWildColor = ChooseWildColor(true); // Human player chooses
-                    _gameLog.LogColorChoice(1, _gameState.ChosenWildColor.Value, " for the starting card");
-                }
-            }
-            
-            // Refresh the UI
-            UpdateDeckCount();
-            RenderAllPlayers();
-            RenderDiscardPile();
-            UpdateTurnIndicator();
         }
 
         private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
@@ -388,37 +207,37 @@ namespace Un
         private void UpdateTurnIndicator()
         {
             // Update labels and turn indicators
-            Player1Label.Text = $"You ({_gameState.Player1Hand.Count} cards)";
-            Player2Label.Text = $"Alice ({_gameState.Player2Hand.Count} cards)";
-            Player3Label.Text = $"Bob ({_gameState.Player3Hand.Count} cards)";
-            Player4Label.Text = $"Charlie ({_gameState.Player4Hand.Count} cards)";
+            Player1Label.Text = $"{_engine.State.GetPlayerName(1)} ({_engine.State.Player1Hand.Count} cards)";
+            Player2Label.Text = $"{_engine.State.GetPlayerName(2)} ({_engine.State.Player2Hand.Count} cards)";
+            Player3Label.Text = $"{_engine.State.GetPlayerName(3)} ({_engine.State.Player3Hand.Count} cards)";
+            Player4Label.Text = $"{_engine.State.GetPlayerName(4)} ({_engine.State.Player4Hand.Count} cards)";
             
             // Change fill color instead of visibility to prevent layout shift
             var activeColor = System.Windows.Media.Brushes.Red;
             var inactiveColor = System.Windows.Media.Brushes.Transparent;
             
-            Player1TurnIndicator.Fill = _gameState.CurrentPlayer == 1 ? activeColor : inactiveColor;
-            Player2TurnIndicator.Fill = _gameState.CurrentPlayer == 2 ? activeColor : inactiveColor;
-            Player3TurnIndicator.Fill = _gameState.CurrentPlayer == 3 ? activeColor : inactiveColor;
-            Player4TurnIndicator.Fill = _gameState.CurrentPlayer == 4 ? activeColor : inactiveColor;
+            Player1TurnIndicator.Fill = _engine.State.CurrentPlayer == 1 ? activeColor : inactiveColor;
+            Player2TurnIndicator.Fill = _engine.State.CurrentPlayer == 2 ? activeColor : inactiveColor;
+            Player3TurnIndicator.Fill = _engine.State.CurrentPlayer == 3 ? activeColor : inactiveColor;
+            Player4TurnIndicator.Fill = _engine.State.CurrentPlayer == 4 ? activeColor : inactiveColor;
         }
 
         private void NextTurn(CardType? actionCardType = null)
         {
             // Don't allow new turns if game is over
-            if (_gameState.GameIsOver) return;
+            if (_engine.State.GameIsOver) return;
             
             // Clear any drawn card from previous turn
-            _gameState.JustDrawnCard = null;
+            _engine.State.JustDrawnCard = null;
             
             // Advance to next player
-            _gameState.AdvanceToNextPlayer();
+            _engine.State.AdvanceToNextPlayer();
             
             // Handle Draw Four Wild card - next player draws 4 cards and is skipped
             if (actionCardType == CardType.DrawFour)
             {
-                var targetPlayer = _gameState.CurrentPlayer;
-                var targetHand = _gameState.GetPlayerHand(targetPlayer);
+                var targetPlayer = _engine.State.CurrentPlayer;
+                var targetHand = _engine.State.GetPlayerHand(targetPlayer);
                 
                 // Draw 4 cards
                 var drawnCards = new List<Card>();
@@ -433,20 +252,20 @@ namespace Un
                 }
                 
                 // Log the Draw 4 effect with skip
-                _gameLog.LogDrawMultiple(targetPlayer, drawnCards.Count, targetPlayer == 1 ? drawnCards : null, " and was skipped!");
+                _engine.Log.LogDrawMultiple(targetPlayer, drawnCards.Count, targetPlayer == 1 ? drawnCards : null, " and was skipped!");
                 
                 // Update displays
                 RenderAllPlayers();
                 UpdateDeckCount();
                 
                 // Advance to the next player after the one who drew 4
-                _gameState.AdvanceToNextPlayer();
+                _engine.State.AdvanceToNextPlayer();
             }
             // Handle Draw Two card - next player draws 2 cards and is skipped
             else if (actionCardType == CardType.DrawTwo)
             {
-                var targetPlayer = _gameState.CurrentPlayer;
-                var targetHand = _gameState.GetPlayerHand(targetPlayer);
+                var targetPlayer = _engine.State.CurrentPlayer;
+                var targetHand = _engine.State.GetPlayerHand(targetPlayer);
                 
                 // Draw 2 cards
                 var drawnCards = new List<Card>();
@@ -461,30 +280,30 @@ namespace Un
                 }
                 
                 // Log the Draw 2 effect with skip
-                _gameLog.LogDrawMultiple(targetPlayer, drawnCards.Count, targetPlayer == 1 ? drawnCards : null, " and was skipped!");
+                _engine.Log.LogDrawMultiple(targetPlayer, drawnCards.Count, targetPlayer == 1 ? drawnCards : null, " and was skipped!");
                 
                 // Update displays
                 RenderAllPlayers();
                 UpdateDeckCount();
                 
                 // Advance to the next player after the one who drew 2
-                _gameState.AdvanceToNextPlayer();
+                _engine.State.AdvanceToNextPlayer();
             }
             // Handle Skip card - next player is skipped
             else if (actionCardType == CardType.Skip)
             {
-                var skippedPlayer = _gameState.CurrentPlayer;
-                _gameLog.LogSkip(skippedPlayer, "!");
-                PlaySkipSound();
+                var skippedPlayer = _engine.State.CurrentPlayer;
+                _engine.Log.LogSkip(skippedPlayer, "!");
+                _ = _soundManager.PlaySkipSoundAsync();
                 
                 // Advance to the next player after the skipped one
-                _gameState.AdvanceToNextPlayer();
+                _engine.State.AdvanceToNextPlayer();
             }
             
             UpdateTurnIndicator();
             
             // If it's an AI player's turn, let them play
-            if (_gameState.CurrentPlayer != 1)
+            if (_engine.State.CurrentPlayer != 1)
             {
                 System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
                     new System.Action(() => AIPlayerTurn()),
@@ -498,7 +317,7 @@ namespace Un
             // Small delay so player can see the turn change
             await System.Threading.Tasks.Task.Delay(800);
             
-            var currentHand = _gameState.GetPlayerHand(_gameState.CurrentPlayer);
+            var currentHand = _engine.State.GetPlayerHand(_engine.State.CurrentPlayer);
 
             if (currentHand.Count == 0)
             {
@@ -506,70 +325,43 @@ namespace Un
                 return;
             }
 
-            var topCard = _gameState.GetTopDiscardCard();
+            var topCard = _engine.State.GetTopDiscardCard();
             Card? cardToPlay = null;
 
             // Try to find a playable card
             if (topCard != null)
             {
-                cardToPlay = currentHand.FirstOrDefault(c => CanPlayCard(c, topCard));
+                cardToPlay = currentHand.FirstOrDefault(c => _engine.CanPlayCard(c, topCard));
             }
 
             if (cardToPlay != null)
             {
-                // Play the card
-                currentHand.Remove(cardToPlay);
-                _gameState.DiscardPile.Add(cardToPlay);
-                
-                // Log the play
-                _gameLog.LogPlay(_gameState.CurrentPlayer, cardToPlay);
-                
-                // Check if player has one card left (UN!)
-                if (currentHand.Count == 1)
+                // Try to play the card using GameEngine
+                if (_engine.TryPlayCard(_engine.State.CurrentPlayer, cardToPlay, () => ChooseWildColor(false)))
                 {
-                    _gameLog.LogUn(_gameState.CurrentPlayer);
+                    // Update visuals immediately
+                    RenderAllPlayers();
+                    RenderDiscardPile();
+                    UpdateDeckCount();
+                    
+                    // Check if this player won
+                    if (_engine.State.Players[_engine.State.CurrentPlayer - 1].Hand.Count == 0)
+                    {
+                        CheckForWinner();
+                        return; // Don't continue if game is over
+                    }
+                    
+                    // Play sound in background without blocking
+                    _ = _soundManager.PlayCardSoundAsync();
+                    
+                    await System.Threading.Tasks.Task.Delay(300);
+                    
+                    // Pass the card type if it's Skip, DrawTwo, or DrawFour
+                    var actionCard = (cardToPlay.Type == CardType.Skip || cardToPlay.Type == CardType.DrawTwo || cardToPlay.Type == CardType.DrawFour) 
+                        ? cardToPlay.Type 
+                        : (CardType?)null;
+                    NextTurn(actionCard);
                 }
-                
-                // Handle wild card color selection
-                if (cardToPlay.Type == CardType.Wild || cardToPlay.Type == CardType.DrawFour)
-                {
-                    _gameState.ChosenWildColor = ChooseWildColor(false); // AI chooses
-                    _gameLog.LogColorChoice(_gameState.CurrentPlayer, _gameState.ChosenWildColor.Value);
-                }
-                else
-                {
-                    // Clear wild color if not a wild card
-                    _gameState.ChosenWildColor = null;
-                }
-                
-                // Check if reverse was played
-                if (cardToPlay.Type == CardType.Reverse)
-                {
-                    _gameState.IsClockwise = !_gameState.IsClockwise;
-                }
-                
-                // Update visuals immediately
-                RenderAllPlayers();
-                RenderDiscardPile();
-                UpdateDeckCount();
-                
-                // Check if this player won
-                if (currentHand.Count == 0)
-                {
-                    CheckForWinner();
-                    return; // Don't continue if game is over
-                }
-                
-                // Play sound in background without blocking
-                _ = PlayCardSoundAsync();
-                
-                await System.Threading.Tasks.Task.Delay(300);
-                
-                // Pass the card type if it's Skip, DrawTwo, or DrawFour
-                var actionCard = (cardToPlay.Type == CardType.Skip || cardToPlay.Type == CardType.DrawTwo || cardToPlay.Type == CardType.DrawFour) 
-                    ? cardToPlay.Type 
-                    : (CardType?)null;
-                NextTurn(actionCard);
             }
             else
             {
@@ -580,77 +372,52 @@ namespace Un
                     currentHand.Add(drawnCard);
                     
                     // Log the draw
-                    _gameLog.LogDraw(_gameState.CurrentPlayer);
+                    _engine.Log.LogDraw(_engine.State.CurrentPlayer);
                     
                     UpdateDeckCount();
                     RenderAllPlayers();
                     
                     // Check if the drawn card can be played
-                    if (topCard != null && CanPlayCard(drawnCard, topCard))
+                    if (topCard != null && _engine.CanPlayCard(drawnCard, topCard))
                     {
                         // AI decides to play it (50% chance for variety)
                         if (new System.Random().Next(2) == 0)
                         {
                             await System.Threading.Tasks.Task.Delay(500);
-                            currentHand.Remove(drawnCard);
-                            _gameState.DiscardPile.Add(drawnCard);
                             
-                            // Log the play
-                            _gameLog.LogPlay(_gameState.CurrentPlayer, drawnCard);
-                            
-                            // Check if player has one card left (UN!)
-                            if (currentHand.Count == 1)
+                            // Try to play the drawn card using GameEngine
+                            if (_engine.TryPlayCard(_engine.State.CurrentPlayer, drawnCard, () => ChooseWildColor(false)))
                             {
-                                _gameLog.LogUn(_gameState.CurrentPlayer);
+                                // Update visuals immediately
+                                RenderAllPlayers();
+                                RenderDiscardPile();
+                                UpdateDeckCount();
+                                
+                                // Check if this player won
+                                if (_engine.State.Players[_engine.State.CurrentPlayer - 1].Hand.Count == 0)
+                                {
+                                    CheckForWinner();
+                                    return; // Don't continue if game is over
+                                }
+                                
+                                // Play sound in background without blocking
+                                _ = _soundManager.PlayCardSoundAsync();
+                                
+                                await System.Threading.Tasks.Task.Delay(300);
+                                
+                                // Pass the card type if it's Skip, DrawTwo, or DrawFour (only when actually played)
+                                var actionCard = (drawnCard.Type == CardType.Skip || drawnCard.Type == CardType.DrawTwo || drawnCard.Type == CardType.DrawFour)
+                                    ? drawnCard.Type
+                                    : (CardType?)null;
+                                NextTurn(actionCard);
+                                return; // Exit early since we already called NextTurn
                             }
-                            
-                            // Handle wild card color selection
-                            if (drawnCard.Type == CardType.Wild || drawnCard.Type == CardType.DrawFour)
-                            {
-                                _gameState.ChosenWildColor = ChooseWildColor(false); // AI chooses
-                                _gameLog.LogColorChoice(_gameState.CurrentPlayer, _gameState.ChosenWildColor.Value);
-                            }
-                            else
-                            {
-                                // Clear wild color if not a wild card
-                                _gameState.ChosenWildColor = null;
-                            }
-                            
-                            // Check if reverse was played
-                            if (drawnCard.Type == CardType.Reverse)
-                            {
-                                _gameState.IsClockwise = !_gameState.IsClockwise;
-                            }
-                            
-                            // Update visuals immediately
-                            RenderAllPlayers();
-                            RenderDiscardPile();
-                            UpdateDeckCount();
-                            
-                            // Check if this player won
-                            if (currentHand.Count == 0)
-                            {
-                                CheckForWinner();
-                                return; // Don't continue if game is over
-                            }
-                            
-                            // Play sound in background without blocking
-                            _ = PlayCardSoundAsync();
-                            
-                            await System.Threading.Tasks.Task.Delay(300);
-                            
-                            // Pass the card type if it's Skip, DrawTwo, or DrawFour (only when actually played)
-                            var actionCard = (drawnCard.Type == CardType.Skip || drawnCard.Type == CardType.DrawTwo || drawnCard.Type == CardType.DrawFour)
-                                ? drawnCard.Type
-                                : (CardType?)null;
-                            NextTurn(actionCard);
-                            return; // Exit early since we already called NextTurn
                         }
                     }
                 }
                 
                 // Play sound in background without blocking
-                _ = PlayCardSoundAsync();
+                _ = _soundManager.PlayCardSoundAsync();
                 
                 await System.Threading.Tasks.Task.Delay(300);
                 
@@ -662,16 +429,16 @@ namespace Un
         private void StockPile_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             // Don't allow moves if game is over
-            if (_gameState.GameIsOver) return;
+            if (_engine.State.GameIsOver) return;
             
             // Only allow human player to draw on their turn
-            if (_gameState.CurrentPlayer != 1) return;
+            if (_engine.State.CurrentPlayer != 1) return;
             
             // If player already drew a card this turn, clicking again passes the turn
-            if (_gameState.JustDrawnCard != null)
+            if (_engine.State.JustDrawnCard != null)
             {
-                _gameState.JustDrawnCard = null; // Clear the drawn card
-                PlayCardSound();
+                _engine.State.JustDrawnCard = null; // Clear the drawn card
+                _ = _soundManager.PlayCardSoundAsync();
                 NextTurn(); // Pass turn
                 return;
             }
@@ -679,26 +446,26 @@ namespace Un
             var card = _engine.DrawCard();
             if (card != null)
             {
-                _gameState.Player1Hand.Add(card);
-                _gameState.JustDrawnCard = card; // Mark this as the only playable card
+                _engine.State.Player1Hand.Add(card);
+                _engine.State.JustDrawnCard = card; // Mark this as the only playable card
                 
                 // Log the draw with the card info (for human player)
-                _gameLog.LogDraw(1, card);
+                _engine.Log.LogDraw(1, card);
                 
                 RenderPlayer1Hand();
                 UpdateDeckCount();
                 
                 // Play sound
-                PlayCardSound();
+                _ = _soundManager.PlayCardSoundAsync();
                 
                 // Check if the drawn card is playable
-                var topCard = _gameState.GetTopDiscardCard();
+                var topCard = _engine.State.GetTopDiscardCard();
                 if (topCard != null)
                 {
-                    if (!CanPlayCard(card, topCard))
+                    if (!_engine.CanPlayCard(card, topCard))
                     {
                         // Card is not playable, automatically pass turn
-                        _gameState.JustDrawnCard = null;
+                        _engine.State.JustDrawnCard = null;
                         NextTurn();
                     }
                     // Otherwise, player can play the drawn card
@@ -706,59 +473,10 @@ namespace Un
             }
         }
 
-        private bool CanPlayCard(Card card, Card topCard)
-        {
-            // Wild cards can always be played
-            if (card.Type == CardType.Wild || card.Type == CardType.DrawFour)
-            {
-                return true;
-            }
-
-            // If the top card is a wild card, check against the chosen color
-            if ((topCard.Type == CardType.Wild || topCard.Type == CardType.DrawFour) && _gameState.ChosenWildColor.HasValue)
-            {
-                // Match against the chosen wild color
-                if (card.Color == _gameState.ChosenWildColor.Value)
-                {
-                    return true;
-                }
-                
-                // Number cards of the chosen color can be played
-                if (card.Type == CardType.Number && card.Color == _gameState.ChosenWildColor.Value)
-                {
-                    return true;
-                }
-                
-                return false;
-            }
-
-            // Match by color
-            if (card.Color == topCard.Color)
-            {
-                return true;
-            }
-
-            // Number cards match by number
-            if (card.Type == CardType.Number && topCard.Type == CardType.Number && 
-                card.Number == topCard.Number)
-            {
-                return true;
-            }
-
-            // Action cards match with same action type (Skip with Skip, etc.)
-            if (card.Type == topCard.Type && 
-                (card.Type == CardType.Skip || card.Type == CardType.Reverse || card.Type == CardType.DrawTwo))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         private void PlayerCard_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             // Only allow interaction on player 1's turn
-            if (_gameState.CurrentPlayer != 1) return;
+            if (_engine.State.CurrentPlayer != 1) return;
             
             if (sender is System.Windows.Controls.Border border)
             {
@@ -771,7 +489,7 @@ namespace Un
         private void PlayerCard_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             // Don't allow moves if game is over
-            if (_gameState.GameIsOver) return;
+            if (_engine.State.GameIsOver) return;
             
             if (sender is System.Windows.Controls.Border border && border.Tag is Card card)
             {
@@ -784,99 +502,52 @@ namespace Un
                         position.Y >= 0 && position.Y <= border.ActualHeight)
                     {
                         // If player drew a card this turn, only allow playing that specific card
-                        if (_gameState.JustDrawnCard != null && card != _gameState.JustDrawnCard)
+                        if (_engine.State.JustDrawnCard != null && card != _engine.State.JustDrawnCard)
                         {
                             // Can't play any other card after drawing
-                            PlayErrorSound();
+                            _ = _soundManager.PlayErrorSoundAsync();
                             _pressedCardBorder = null;
                             return;
                         }
                         
-                        // Check if the card can be played
-                        var topCard = _gameState.GetTopDiscardCard();
-                        if (topCard != null)
+                        // Try to play the card using GameEngine
+                        if (_engine.TryPlayCard(1, card, () => ChooseWildColor(true)))
                         {
-                            if (CanPlayCard(card, topCard))
-                            {
-                                // Play success sound (async, doesn't block player)
-                                PlayCardSound();
-                                
-                                // Remove card from player's hand
-                                _gameState.Player1Hand.Remove(card);
-                                
-                                // Add card to discard pile
-                                _gameState.DiscardPile.Add(card);
-                                
-                                // Log the play
-                                _gameLog.LogPlay(1, card);
-                                
-                                // Check if player has one card left (UN!)
-                                if (_gameState.Player1Hand.Count == 1)
-                                {
-                                    _gameLog.LogUn(1);
-                                }
-                                
-                                // Handle wild card color selection
-                                if (card.Type == CardType.Wild || card.Type == CardType.DrawFour)
-                                {
-                                    _gameState.ChosenWildColor = ChooseWildColor(true); // Human chooses with dialog
-                                    _gameLog.LogColorChoice(1, _gameState.ChosenWildColor.Value);
-                                }
-                                else
-                                {
-                                    // Clear wild color if not a wild card
-                                    _gameState.ChosenWildColor = null;
-                                }
-                                
-                                // Check if reverse was played
-                                if (card.Type == CardType.Reverse)
-                                {
-                                    _gameState.IsClockwise = !_gameState.IsClockwise;
-                                }
-                                
-                                // Clear the just drawn card since we played it
-                                _gameState.JustDrawnCard = null;
-                                
-                                // Update displays
-                                RenderPlayer1Hand();
-                                RenderDiscardPile();
-                                UpdateDeckCount();
-                                
-                                // Check if player won
-                                if (_gameState.Player1Hand.Count == 0)
-                                {
-                                    CheckForWinner();
-                                    return; // Don't continue if game is over
-                                }
-                                
-                                // Next player's turn (pass action card type if Skip, DrawTwo, or DrawFour)
-                                var actionCard = (card.Type == CardType.Skip || card.Type == CardType.DrawTwo || card.Type == CardType.DrawFour)
-                                    ? card.Type
-                                    : (CardType?)null;
-                                NextTurn(actionCard);
-                            }
-                            else
-                            {
-                                // Card can't be played, move it to the end of the hand
-                                _gameState.Player1Hand.Remove(card);
-                                _gameState.Player1Hand.Add(card);
-                                
-                                // Re-render the hand to show new position
-                                RenderPlayer1Hand();
-                                
-                                // Play error sound
-                                PlayErrorSound();
-                            }
-                        }
-                        else
-                        {
-                            // No cards in discard pile (shouldn't happen), allow any card
-                            PlayCardSound();
-                            _gameState.Player1Hand.Remove(card);
-                            _gameState.DiscardPile.Add(card);
+                            // Play success sound (async, doesn't block player)
+                            _ = _soundManager.PlayCardSoundAsync();
+                            
+                            // Clear the just drawn card since we played it
+                            _engine.State.JustDrawnCard = null;
+                            
+                            // Update displays
                             RenderPlayer1Hand();
                             RenderDiscardPile();
                             UpdateDeckCount();
+                            
+                            // Check if player won
+                            if (_engine.State.Player1Hand.Count == 0)
+                            {
+                                CheckForWinner();
+                                return; // Don't continue if game is over
+                            }
+                            
+                            // Next player's turn (pass action card type if Skip, DrawTwo, or DrawFour)
+                            var actionCard = (card.Type == CardType.Skip || card.Type == CardType.DrawTwo || card.Type == CardType.DrawFour)
+                                ? card.Type
+                                : (CardType?)null;
+                            NextTurn(actionCard);
+                        }
+                        else
+                        {
+                            // Card can't be played, move it to the end of the hand
+                            _engine.State.Player1Hand.Remove(card);
+                            _engine.State.Player1Hand.Add(card);
+                            
+                            // Re-render the hand to show new position
+                            RenderPlayer1Hand();
+                            
+                            // Play error sound
+                            _ = _soundManager.PlayErrorSoundAsync();
                         }
                     }
                     else
@@ -903,10 +574,10 @@ namespace Un
         private void UpdateDeckCount()
         {
             StockPileLabel.Text = $"Stock Pile ({_engine.DeckCount})";
-            Player1Label.Text = $"You ({_gameState.Player1Hand.Count} cards)";
-            Player2Label.Text = $"Alice ({_gameState.Player2Hand.Count} cards)";
-            Player3Label.Text = $"Bob ({_gameState.Player3Hand.Count} cards)";
-            Player4Label.Text = $"Charlie ({_gameState.Player4Hand.Count} cards)";
+            Player1Label.Text = $"{_engine.State.GetPlayerName(1)} ({_engine.State.Player1Hand.Count} cards)";
+            Player2Label.Text = $"{_engine.State.GetPlayerName(2)} ({_engine.State.Player2Hand.Count} cards)";
+            Player3Label.Text = $"{_engine.State.GetPlayerName(3)} ({_engine.State.Player3Hand.Count} cards)";
+            Player4Label.Text = $"{_engine.State.GetPlayerName(4)} ({_engine.State.Player4Hand.Count} cards)";
         }
 
         private void RenderAllPlayers()
@@ -917,356 +588,162 @@ namespace Un
             RenderPlayer4Hand();
         }
 
-        private void RenderPlayer1Hand()
+        private void RenderPlayerHand(int playerNumber)
         {
-            Player1HandDisplay.Items.Clear();
+            var player = _engine.State.Players[playerNumber - 1];
+            var hand = player.Hand;
+            var isHuman = player.IsHuman;
             
-            // Calculate dynamic overlap based on number of cards
-            // More aggressive overlap to fit all cards in available space
-            int cardCount = _gameState.Player1Hand.Count;
-            int baseOverlap = -75;  // Increased from -60
-            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(-95, baseOverlap - (cardCount - 7) * 4);
-            
-            foreach (var card in _gameState.Player1Hand)
+            // Get the appropriate display control
+            System.Windows.Controls.ItemsControl display = playerNumber switch
             {
-                // Outer border (thin black)
+                1 => Player1HandDisplay,
+                2 => Player2HandDisplay,
+                3 => Player3HandDisplay,
+                4 => Player4HandDisplay,
+                _ => throw new ArgumentException($"Invalid player number: {playerNumber}")
+            };
+            
+            display.Items.Clear();
+            
+            // Calculate dynamic overlap based on number of cards and orientation
+            int cardCount = hand.Count;
+            bool isVertical = playerNumber == 3 || playerNumber == 4;
+            int baseOverlap = isVertical ? -105 : -75;
+            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(isVertical ? -135 : -95, baseOverlap - (cardCount - 7) * (isVertical ? 5 : 4));
+            
+            // Determine rotation for side players
+            RotateTransform? rotation = playerNumber switch
+            {
+                3 => new RotateTransform(90),   // Left player rotates clockwise
+                4 => new RotateTransform(-90),  // Right player rotates counter-clockwise
+                _ => null
+            };
+            
+            foreach (var card in hand)
+            {
+                // Create card visual using SVG renderer
+                var cardVisual = CardRenderer.CreateCardVisual(card, showBack: !isHuman);
+                
+                // Wrap in outer border for consistent sizing and interaction
                 var outerBorder = new System.Windows.Controls.Border
                 {
                     Width = 100,
                     Height = 140,
-                    CornerRadius = new CornerRadius(4),
-                    BorderBrush = System.Windows.Media.Brushes.Black,
-                    BorderThickness = new Thickness(2),
-                    Margin = new Thickness(0, 0, overlap, 0),  // Dynamic overlap
-                    Cursor = System.Windows.Input.Cursors.Hand,
-                    Tag = card  // Store the card reference
+                    Margin = isVertical ? new Thickness(0, 0, 0, overlap) : new Thickness(0, 0, overlap, 0),
+                    Cursor = isHuman ? System.Windows.Input.Cursors.Hand : System.Windows.Input.Cursors.Arrow,
+                    Tag = isHuman ? card : null,
+                    Child = cardVisual
                 };
-
-                // Add mouse handlers to outer border
-                outerBorder.MouseLeftButtonDown += PlayerCard_MouseDown;
-                outerBorder.MouseLeftButtonUp += PlayerCard_MouseUp;
-                outerBorder.MouseLeave += PlayerCard_MouseLeave;
-
-                // Inner border (thick white)
-                var cardBorder = new System.Windows.Controls.Border
+                
+                // Apply rotation for side players
+                if (rotation != null)
                 {
-                    BorderBrush = System.Windows.Media.Brushes.White,
-                    BorderThickness = new Thickness(4),
-                    CornerRadius = new CornerRadius(2)
-                };
-
-                // Set background color
-                cardBorder.Background = card.Type switch
-                {
-                    CardType.Wild => System.Windows.Media.Brushes.Black,
-                    CardType.DrawFour => System.Windows.Media.Brushes.Black,
-                    _ => card.Color switch
-                    {
-                        CardColor.Red => new SolidColorBrush(Color.FromRgb(220, 20, 60)),      // Crimson
-                        CardColor.Blue => new SolidColorBrush(Color.FromRgb(30, 144, 255)),    // DodgerBlue
-                        CardColor.Green => new SolidColorBrush(Color.FromRgb(50, 205, 50)),    // LimeGreen
-                        CardColor.Yellow => new SolidColorBrush(Color.FromRgb(255, 215, 0)),   // Gold
-                        _ => System.Windows.Media.Brushes.LightGray
-                    }
-                };
-
-                var grid = new System.Windows.Controls.Grid();
-
-                // Top-left indicator showing card value/type prominently
-                var topLeft = new System.Windows.Controls.TextBlock
-                {
-                    FontSize = 18,
-                    FontWeight = FontWeights.Bold,
-                    Margin = new Thickness(6),
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    VerticalAlignment = VerticalAlignment.Top
-                };
-
-                // Set the value text for top-left
-                if (card.Type == CardType.Number && card.Number.HasValue)
-                {
-                    topLeft.Text = card.Number.Value.ToString();
+                    outerBorder.RenderTransform = rotation;
+                    outerBorder.RenderTransformOrigin = new Point(0.5, 0.5);
                 }
-                else
+                
+                // Add mouse handlers only for human player
+                if (isHuman)
                 {
-                    topLeft.Text = card.Type switch
-                    {
-                        CardType.Skip => "S",
-                        CardType.Reverse => "R",
-                        CardType.DrawTwo => "+2",
-                        CardType.Wild => "W",
-                        CardType.DrawFour => "+4",
-                        _ => string.Empty
-                    };
+                    outerBorder.MouseLeftButtonDown += PlayerCard_MouseDown;
+                    outerBorder.MouseLeftButtonUp += PlayerCard_MouseUp;
+                    outerBorder.MouseLeave += PlayerCard_MouseLeave;
                 }
 
-                // Center text (emoji or symbol)
-                var center = new System.Windows.Controls.TextBlock
-                {
-                    FontSize = 32,
-                    FontWeight = FontWeights.Bold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                if (card.Type == CardType.Number && card.Number.HasValue)
-                {
-                    center.Text = card.Number.Value.ToString();
-                }
-                else
-                {
-                    center.Text = card.Type switch
-                    {
-                        CardType.Skip => "🚫",
-                        CardType.Reverse => "🔁",
-                        CardType.DrawTwo => "+2",
-                        CardType.Wild => "W",
-                        CardType.DrawFour => "+4",
-                        _ => string.Empty
-                    };
-                }
-
-                // Set text color
-                var fg = (card.Type == CardType.Wild || card.Type == CardType.DrawFour)
-                    ? System.Windows.Media.Brushes.White
-                    : System.Windows.Media.Brushes.Black;
-                topLeft.Foreground = fg;
-                center.Foreground = fg;
-
-                grid.Children.Add(topLeft);
-                grid.Children.Add(center);
-                cardBorder.Child = grid;
-                outerBorder.Child = cardBorder;
-
-                Player1HandDisplay.Items.Add(outerBorder);
+                display.Items.Add(outerBorder);
             }
+        }
+
+        private void RenderPlayer1Hand()
+        {
+            RenderPlayerHand(1);
         }
 
         private void RenderPlayer2Hand()
         {
-            Player2HandDisplay.Items.Clear();
-            
-            // Calculate dynamic overlap based on number of cards
-            // More aggressive overlap to fit all cards in available space
-            int cardCount = _gameState.Player2Hand.Count;
-            int baseOverlap = -75;  // Increased from -50
-            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(-95, baseOverlap - (cardCount - 7) * 4);
-            
-            foreach (var card in _gameState.Player2Hand)
-            {
-                // Outer border (thin black)
-                var outerBorder = new System.Windows.Controls.Border
-                {
-                    Width = 100,
-                    Height = 140,
-                    CornerRadius = new CornerRadius(4),
-                    BorderBrush = System.Windows.Media.Brushes.Black,
-                    BorderThickness = new Thickness(2),
-                    Margin = new Thickness(0, 0, overlap, 0),  // Dynamic overlap
-                    Background = System.Windows.Media.Brushes.Black
-                };
-
-                // Inner border (thick white)
-                var cardBorder = new System.Windows.Controls.Border
-                {
-                    BorderBrush = System.Windows.Media.Brushes.White,
-                    BorderThickness = new Thickness(4),
-                    CornerRadius = new CornerRadius(2),
-                    Background = System.Windows.Media.Brushes.Black
-                };
-
-                var text = new System.Windows.Controls.TextBlock
-                {
-                    Text = "UN",
-                    FontSize = 36,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = System.Windows.Media.Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                cardBorder.Child = text;
-                outerBorder.Child = cardBorder;
-                Player2HandDisplay.Items.Add(outerBorder);
-            }
+            RenderPlayerHand(2);
         }
 
         private void RenderPlayer3Hand()
         {
-            Player3HandDisplay.Items.Clear();
-            
-            // Calculate dynamic overlap based on number of cards
-            // Rotated cards need more overlap (140px dimension vs 100px) - multiply by ~1.4
-            // More aggressive overlap to fit all cards in available space
-            int cardCount = _gameState.Player3Hand.Count;
-            int baseOverlap = -105;  // -75 * 1.4 ≈ -105 to match horizontal card overlap visually
-            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(-135, baseOverlap - (cardCount - 7) * 5);
-            
-            foreach (var card in _gameState.Player3Hand)
-            {
-                // Outer border (thin black)
-                var outerBorder = new System.Windows.Controls.Border
-                {
-                    Width = 100,
-                    Height = 140,
-                    CornerRadius = new CornerRadius(4),
-                    BorderBrush = System.Windows.Media.Brushes.Black,
-                    BorderThickness = new Thickness(2),
-                    Margin = new Thickness(0, 0, 0, overlap),  // Dynamic vertical overlap
-                    Background = System.Windows.Media.Brushes.Black,
-                    RenderTransform = new RotateTransform(90),  // Rotate 90 degrees clockwise
-                    RenderTransformOrigin = new Point(0.5, 0.5)
-                };
-
-                // Inner border (thick white)
-                var cardBorder = new System.Windows.Controls.Border
-                {
-                    BorderBrush = System.Windows.Media.Brushes.White,
-                    BorderThickness = new Thickness(4),
-                    CornerRadius = new CornerRadius(2),
-                    Background = System.Windows.Media.Brushes.Black
-                };
-
-                var text = new System.Windows.Controls.TextBlock
-                {
-                    Text = "UN",
-                    FontSize = 36,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = System.Windows.Media.Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-
-                cardBorder.Child = text;
-                outerBorder.Child = cardBorder;
-                Player3HandDisplay.Items.Add(outerBorder);
-            }
+            RenderPlayerHand(3);
         }
 
         private void RenderPlayer4Hand()
         {
-            Player4HandDisplay.Items.Clear();
+            RenderPlayerHand(4);
+        }
+
+        private void RenderDiscardPile()
+        {
+            DiscardPileContainer.Child = null;
             
-            // Calculate dynamic overlap based on number of cards
-            // Rotated cards need more overlap (140px dimension vs 100px) - multiply by ~1.4
-            // More aggressive overlap to fit all cards in available space
-            int cardCount = _gameState.Player4Hand.Count;
-            int baseOverlap = -105;  // -75 * 1.4 ≈ -105 to match horizontal card overlap visually
-            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(-135, baseOverlap - (cardCount - 7) * 5);
-            
-            foreach (var card in _gameState.Player4Hand)
+            if (_engine.State.DiscardPile.Count == 0)
             {
-                // Outer border (thin black)
-                var outerBorder = new System.Windows.Controls.Border
+                // Show empty placeholder
+                var emptyBorder = new System.Windows.Controls.Border
                 {
                     Width = 100,
                     Height = 140,
                     CornerRadius = new CornerRadius(4),
                     BorderBrush = System.Windows.Media.Brushes.Black,
                     BorderThickness = new Thickness(2),
-                    Margin = new Thickness(0, 0, 0, overlap),  // Dynamic vertical overlap
-                    Background = System.Windows.Media.Brushes.Black,
-                    RenderTransform = new RotateTransform(-90),  // Rotate 90 degrees counter-clockwise
-                    RenderTransformOrigin = new Point(0.5, 0.5)
+                    Background = System.Windows.Media.Brushes.LightGray
                 };
-
-                // Inner border (thick white)
-                var cardBorder = new System.Windows.Controls.Border
+                
+                var emptyText = new System.Windows.Controls.TextBlock
                 {
-                    BorderBrush = System.Windows.Media.Brushes.White,
-                    BorderThickness = new Thickness(4),
-                    CornerRadius = new CornerRadius(2),
-                    Background = System.Windows.Media.Brushes.Black
-                };
-
-                var text = new System.Windows.Controls.TextBlock
-                {
-                    Text = "UN",
-                    FontSize = 36,
+                    Text = "Empty",
+                    FontSize = 20,
                     FontWeight = FontWeights.Bold,
-                    Foreground = System.Windows.Media.Brushes.White,
+                    Foreground = System.Windows.Media.Brushes.Gray,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 };
-
-                cardBorder.Child = text;
-                outerBorder.Child = cardBorder;
-                Player4HandDisplay.Items.Add(outerBorder);
-            }
-        }
-
-        private void RenderDiscardPile()
-        {
-            if (_gameState.DiscardPile.Count == 0)
-            {
-                DiscardPileDisplay.Background = System.Windows.Media.Brushes.LightGray;
-                DiscardCenter.Text = "Empty";
-                DiscardCenter.Foreground = System.Windows.Media.Brushes.Black;
-                WildColorIndicator.Visibility = Visibility.Collapsed;
+                
+                emptyBorder.Child = emptyText;
+                DiscardPileContainer.Child = emptyBorder;
                 return;
             }
 
-            // Show the top card of the discard pile
-            var topCard = _gameState.GetTopDiscardCard();
+            // Show the top card of the discard pile using SVG
+            var topCard = _engine.State.GetTopDiscardCard();
             if (topCard == null) return;
 
-            // Set background color - Wild cards always have black background
-            DiscardPileDisplay.Background = topCard.Type switch
+            var cardVisual = CardRenderer.CreateCardVisual(topCard, showBack: false);
+            DiscardPileContainer.Child = cardVisual;
+        }
+
+        private void RenderStockPile()
+        {
+            // Always show the card back for stock pile
+            StockPileContainer.Child = null;
+            
+            // Create a dummy card just to get the back SVG
+            var dummyCard = new Card(CardType.Number, CardColor.Red, 0);
+            var cardBack = CardRenderer.CreateCardVisual(dummyCard, showBack: true);
+            
+            StockPileContainer.Child = cardBack;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
             {
-                CardType.Wild => System.Windows.Media.Brushes.Black,
-                CardType.DrawFour => System.Windows.Media.Brushes.Black,
-                _ => topCard.Color switch
+                if (disposing)
                 {
-                    CardColor.Red => new SolidColorBrush(Color.FromRgb(220, 20, 60)),      // Crimson
-                    CardColor.Blue => new SolidColorBrush(Color.FromRgb(30, 144, 255)),    // DodgerBlue
-                    CardColor.Green => new SolidColorBrush(Color.FromRgb(50, 205, 50)),    // LimeGreen
-                    CardColor.Yellow => new SolidColorBrush(Color.FromRgb(255, 215, 0)),   // Gold
-                    _ => System.Windows.Media.Brushes.LightGray
+                    // Dispose managed resources
+                    _soundManager?.Dispose();
                 }
-            };
-
-            // Show color indicator for wild cards with chosen color
-            if ((topCard.Type == CardType.Wild || topCard.Type == CardType.DrawFour) && _gameState.ChosenWildColor.HasValue)
-            {
-                WildColorIndicator.Visibility = Visibility.Visible;
-                WildColorIndicator.Background = _gameState.ChosenWildColor.Value switch
-                {
-                    CardColor.Red => new SolidColorBrush(Color.FromRgb(220, 20, 60)),      // Crimson
-                    CardColor.Blue => new SolidColorBrush(Color.FromRgb(30, 144, 255)),    // DodgerBlue
-                    CardColor.Green => new SolidColorBrush(Color.FromRgb(50, 205, 50)),    // LimeGreen
-                    CardColor.Yellow => new SolidColorBrush(Color.FromRgb(255, 215, 0)),   // Gold
-                    _ => System.Windows.Media.Brushes.Gray
-                };
-                WildColorText.Text = _gameState.ChosenWildColor.Value.ToString().ToUpper();
+                _disposed = true;
             }
-            else
-            {
-                WildColorIndicator.Visibility = Visibility.Collapsed;
-            }
-
-            // Center text
-            if (topCard.Type == CardType.Number && topCard.Number.HasValue)
-            {
-                DiscardCenter.Text = topCard.Number.Value.ToString();
-            }
-            else
-            {
-                DiscardCenter.Text = topCard.Type switch
-                {
-                    CardType.Skip => "🚫",
-                    CardType.Reverse => "🔁",
-                    CardType.DrawTwo => "+2",
-                    CardType.Wild => "W",
-                    CardType.DrawFour => "+4",
-                    _ => string.Empty
-                };
-            }
-
-            // Set text color - wild cards always use white text on black
-            var fg = (topCard.Type == CardType.Wild || topCard.Type == CardType.DrawFour)
-                ? System.Windows.Media.Brushes.White
-                : System.Windows.Media.Brushes.Black;
-            DiscardCenter.Foreground = fg;
         }
     }
 }

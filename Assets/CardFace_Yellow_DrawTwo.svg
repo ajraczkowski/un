@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="300" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer black border -->
+  <rect width="200" height="300" rx="15" fill="#000000"/>
+  
+  <!-- White border -->
+  <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
+  
+  <!-- Card Background - Yellow -->
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#FDD835"/>
+  
+  <!-- Decorative Border -->
+  <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  
+  <!-- Draw Two Icon -->
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Two overlapping cards with +2 -->
+  <g filter="url(#shadow)">
+    <!-- Back card (slightly offset) -->
+    <rect x="80" y="115" width="50" height="70" rx="5" fill="#FFFFFF" opacity="0.6" stroke="#FFFFFF" stroke-width="2"/>
+    
+    <!-- Front card -->
+    <rect x="70" y="125" width="50" height="70" rx="5" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+    
+    <!-- +2 text -->
+    <text x="95" y="175" font-family="Arial, sans-serif" font-size="40" font-weight="bold" 
+          fill="#FFFFFF" text-anchor="middle">+2</text>
+  </g>
+  
+  <!-- Corner text -->
+  <text x="25" y="50" font-family="Arial, sans-serif" font-size="12" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="start">Draw two</text>
+  <text x="25" y="50" font-family="Arial, sans-serif" font-size="12" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="start" transform="rotate(180 100 150)">Draw two</text>
+</svg>

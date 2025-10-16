@@ -10,16 +10,19 @@ namespace Un
     public class GameLog
     {
         private readonly ObservableCollection<TextBlock> _logEntries;
-        private readonly ScrollViewer _scrollViewer;
-        private readonly System.Windows.Threading.Dispatcher _dispatcher;
+        private readonly GameState _gameState;
 
         public ObservableCollection<TextBlock> Entries => _logEntries;
 
-        public GameLog(ScrollViewer scrollViewer, System.Windows.Threading.Dispatcher dispatcher)
+        /// <summary>
+        /// Event raised when a new log entry is added, allowing subscribers to handle UI updates like scrolling.
+        /// </summary>
+        public event EventHandler? LogEntryAdded;
+
+        public GameLog(GameState gameState)
         {
+            _gameState = gameState;
             _logEntries = new ObservableCollection<TextBlock>();
-            _scrollViewer = scrollViewer;
-            _dispatcher = dispatcher;
         }
 
         public void Clear()
@@ -44,7 +47,7 @@ namespace Un
             logEntry.Inlines.Add(new Run(card.ToString()) { FontWeight = FontWeights.SemiBold });
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogDraw(int playerNumber, Card? drawnCard = null)
@@ -73,7 +76,7 @@ namespace Un
             }
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogColorChoice(int playerNumber, CardColor chosenColor, string context = "")
@@ -106,7 +109,7 @@ namespace Un
             }
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogDrawMultiple(int playerNumber, int cardCount, System.Collections.Generic.List<Card>? cards = null, string reason = "")
@@ -141,29 +144,53 @@ namespace Un
             }
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogUn(int playerNumber)
         {
             var playerName = GetPlayerName(playerNumber);
             var playerColor = GetPlayerColor(playerNumber);
+            var isSecondPerson = string.Equals(playerName, "You", StringComparison.OrdinalIgnoreCase);
 
             // Random humorous UN phrases
             var random = new Random();
-            var phrases = new[]
+            string[] phrases;
+            
+            if (isSecondPerson)
             {
-                "shouts UN at the top of their lungs!",
-                "screams UN like their life depends on it!",
-                "bellows UN with the fury of a thousand suns!",
-                "yells UN so loud the neighbors complain!",
-                "triumphantly declares UN with a fist pump!",
-                "whispers UN... just kidding, SCREAMS IT!",
-                "howls UN like a wolf at the moon!",
-                "proclaims UN with dramatic flair!",
-                "shrieks UN and does a little victory dance!",
-                "announces UN as if winning an Oscar!"
-            };
+                // Second person verbs for "You"
+                phrases = new[]
+                {
+                    "shout UN at the top of your lungs!",
+                    "scream UN like your life depends on it!",
+                    "bellow UN with the fury of a thousand suns!",
+                    "yell UN so loud the neighbors complain!",
+                    "triumphantly declare UN with a fist pump!",
+                    "whisper UN... just kidding, SCREAM IT!",
+                    "howl UN like a wolf at the moon!",
+                    "proclaim UN with dramatic flair!",
+                    "shriek UN and do a little victory dance!",
+                    "announce UN as if winning an Oscar!"
+                };
+            }
+            else
+            {
+                // Third person verbs for other players
+                phrases = new[]
+                {
+                    "shouts UN at the top of their lungs!",
+                    "screams UN like their life depends on it!",
+                    "bellows UN with the fury of a thousand suns!",
+                    "yells UN so loud the neighbors complain!",
+                    "triumphantly declares UN with a fist pump!",
+                    "whispers UN... just kidding, SCREAMS IT!",
+                    "howls UN like a wolf at the moon!",
+                    "proclaims UN with dramatic flair!",
+                    "shrieks UN and does a little victory dance!",
+                    "announces UN as if winning an Oscar!"
+                };
+            }
 
             var selectedPhrase = phrases[random.Next(phrases.Length)];
 
@@ -178,7 +205,7 @@ namespace Un
             logEntry.Inlines.Add(new Run(" " + selectedPhrase) { FontStyle = FontStyles.Italic });
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogWin(int playerNumber)
@@ -199,13 +226,14 @@ namespace Un
             logEntry.Inlines.Add(new Run("🎉") { FontSize = 16 });
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
         public void LogSkip(int playerNumber, string reason = "")
         {
             var playerName = GetPlayerName(playerNumber);
             var playerColor = GetPlayerColor(playerNumber);
+            var isSecondPerson = string.Equals(playerName, "You", StringComparison.OrdinalIgnoreCase);
 
             var logEntry = new TextBlock
             {
@@ -216,7 +244,7 @@ namespace Un
 
             logEntry.Inlines.Add(new Run(playerName) { FontWeight = FontWeights.Bold });
             // Use "were" for "You", "was" for other players
-            var verb = playerNumber == 1 ? " were skipped" : " was skipped";
+            var verb = isSecondPerson ? " were skipped" : " was skipped";
             logEntry.Inlines.Add(new Run(verb));
             
             if (!string.IsNullOrEmpty(reason))
@@ -229,37 +257,17 @@ namespace Un
             }
 
             _logEntries.Add(logEntry);
-            ScrollToBottomIfNeeded();
+            OnLogEntryAdded();
         }
 
-        private void ScrollToBottomIfNeeded()
+        private void OnLogEntryAdded()
         {
-            // Use Dispatcher to ensure this runs after the UI has updated
-            _dispatcher.BeginInvoke(new Action(() =>
-            {
-                // Only auto-scroll if the user is currently at the bottom
-                // This prevents interrupting manual scrolling
-                double tolerance = 5.0; // Small tolerance for floating point comparison
-                bool isAtBottom = _scrollViewer.VerticalOffset >= 
-                                  _scrollViewer.ScrollableHeight - tolerance;
-                
-                if (isAtBottom || _scrollViewer.ScrollableHeight == 0)
-                {
-                    _scrollViewer.ScrollToBottom();
-                }
-            }), System.Windows.Threading.DispatcherPriority.Background);
+            LogEntryAdded?.Invoke(this, EventArgs.Empty);
         }
 
-        private static string GetPlayerName(int playerNumber)
+        private string GetPlayerName(int playerNumber)
         {
-            return playerNumber switch
-            {
-                1 => "You",
-                2 => "Alice",
-                3 => "Bob",
-                4 => "Charlie",
-                _ => "Unknown"
-            };
+            return _gameState.GetPlayerName(playerNumber);
         }
 
         private static Brush GetPlayerColor(int playerNumber)

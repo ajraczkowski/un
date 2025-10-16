@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="300" viewBox="0 0 200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer black border -->
+  <rect width="200" height="300" rx="15" fill="#000000"/>
+  
+  <!-- White border -->
+  <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
+  
+  <!-- Card Background - Red -->
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#E63946"/>
+  
+  <!-- Decorative Border -->
+  <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  
+  <!-- Number Display Area - Template for dynamic number -->
+  <defs>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Main Number (placeholder - to be replaced dynamically) -->
+  <text x="100" y="180" font-family="Arial, sans-serif" font-size="120" font-weight="bold" 
+        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="3" 
+        text-anchor="middle" filter="url(#shadow)">0</text>
+  
+  <!-- Small corner numbers -->
+  <text x="30" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="middle">0</text>
+  <text x="170" y="285" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" text-anchor="middle" transform="rotate(180 170 270)">0</text>
+</svg>
