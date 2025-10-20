@@ -26,7 +26,7 @@
             </Grid.Background>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="*" MinHeight="200" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -99,7 +99,7 @@
             </StackPanel>
 
         <!-- Bottom Player (Player 1 - Human) -->
-        <StackPanel Grid.Row="2" Grid.Column="1" Margin="8" MinHeight="180">
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="8" MinHeight="180">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
                 <Ellipse x:Name="Player1TurnIndicator" Width="12" Height="12" Fill="Transparent" Margin="0,0,8,0" />
                 <TextBlock x:Name="Player1Label" Text="You (0 cards)" FontWeight="Bold" Foreground="White" />

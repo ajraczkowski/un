@@ -7,20 +7,14 @@
   <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
   
   <!-- Card Background - Blue -->
-  <rect x="8" y="8" width="184" height="284" rx="12" fill="#1E88E5"/>
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#000080"/>
   
   <!-- Decorative Border -->
   <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
   
   <!-- Skip Icon -->
-  <defs>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
-    </filter>
-  </defs>
-  
   <!-- Circle with slash (prohibited symbol) for Skip -->
-  <g filter="url(#shadow)">
+  <g>
     <!-- Outer circle -->
     <circle cx="100" cy="150" r="50" fill="none" stroke="#FFFFFF" stroke-width="8"/>
     
@@ -29,9 +23,9 @@
   </g>
   
   <!-- Corner text -->
-  <text x="25" y="50" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
-        fill="#FFFFFF" text-anchor="start">Skip</text>
+  <text x="25" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" stroke="#000000" stroke-width="1" text-anchor="start">Skip</text>
   
-  <text x="25" y="50" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
-        fill="#FFFFFF" text-anchor="start" transform="rotate(180 100 150)">Skip</text>
+  <text x="25" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" stroke="#000000" stroke-width="1" text-anchor="start" transform="rotate(180 100 150)">Skip</text>
 </svg>

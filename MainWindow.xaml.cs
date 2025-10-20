@@ -315,7 +315,7 @@ namespace Un
         private async void AIPlayerTurn()
         {
             // Small delay so player can see the turn change
-            await System.Threading.Tasks.Task.Delay(800);
+            await Task.Delay(500);
             
             var currentHand = _engine.State.GetPlayerHand(_engine.State.CurrentPlayer);
 
@@ -353,9 +353,7 @@ namespace Un
                     
                     // Play sound in background without blocking
                     _ = _soundManager.PlayCardSoundAsync();
-                    
-                    await System.Threading.Tasks.Task.Delay(300);
-                    
+                                       
                     // Pass the card type if it's Skip, DrawTwo, or DrawFour
                     var actionCard = (cardToPlay.Type == CardType.Skip || cardToPlay.Type == CardType.DrawTwo || cardToPlay.Type == CardType.DrawFour) 
                         ? cardToPlay.Type 
@@ -383,8 +381,6 @@ namespace Un
                         // AI decides to play it (50% chance for variety)
                         if (new System.Random().Next(2) == 0)
                         {
-                            await System.Threading.Tasks.Task.Delay(500);
-                            
                             // Try to play the drawn card using GameEngine
                             if (_engine.TryPlayCard(_engine.State.CurrentPlayer, drawnCard, () => ChooseWildColor(false)))
                             {
@@ -403,8 +399,6 @@ namespace Un
                                 // Play sound in background without blocking
                                 _ = _soundManager.PlayCardSoundAsync();
                                 
-                                await System.Threading.Tasks.Task.Delay(300);
-                                
                                 // Pass the card type if it's Skip, DrawTwo, or DrawFour (only when actually played)
                                 var actionCard = (drawnCard.Type == CardType.Skip || drawnCard.Type == CardType.DrawTwo || drawnCard.Type == CardType.DrawFour)
                                     ? drawnCard.Type
@@ -418,8 +412,6 @@ namespace Un
                 
                 // Play sound in background without blocking
                 _ = _soundManager.PlayCardSoundAsync();
-                
-                await System.Threading.Tasks.Task.Delay(300);
                 
                 // Only get here if card was not played - no action card effect
                 NextTurn();
@@ -609,9 +601,14 @@ namespace Un
             // Calculate dynamic overlap based on number of cards and orientation
             int cardCount = hand.Count;
             bool isVertical = playerNumber == 3 || playerNumber == 4;
-            int baseOverlap = isVertical ? -105 : -75;
-            int overlap = cardCount <= 7 ? baseOverlap : Math.Max(isVertical ? -135 : -95, baseOverlap - (cardCount - 7) * (isVertical ? 5 : 4));
             
+            int baseOverlap = isVertical ? -115 : -75;
+            int maxOverlap = isVertical ? -139 : -99;
+            int spaceAvailable = isVertical ? (int)display.ActualHeight : (int)display.ActualWidth;
+
+            int overlap = cardCount < 2 ? 0 : (spaceAvailable - (isVertical ? 140 : 100)) / (cardCount - 1);
+            overlap = Math.Max(Math.Min(spaceAvailable, baseOverlap), maxOverlap);
+        
             // Determine rotation for side players
             RotateTransform? rotation = playerNumber switch
             {

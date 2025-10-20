@@ -7,7 +7,7 @@
   <rect x="1" y="1" width="198" height="298" rx="14" fill="#FFFFFF"/>
   
   <!-- Card Background - Red -->
-  <rect x="8" y="8" width="184" height="284" rx="12" fill="#E63946"/>
+  <rect x="8" y="8" width="184" height="284" rx="12" fill="#800000"/>
   
   <!-- Decorative Border -->
   <rect x="18" y="18" width="164" height="264" rx="8" fill="none" stroke="#FFFFFF" stroke-width="2"/>
@@ -21,12 +21,12 @@
   
   <!-- Main Number (placeholder - to be replaced dynamically) -->
   <text x="100" y="180" font-family="Arial, sans-serif" font-size="120" font-weight="bold" 
-        fill="#FFFFFF" stroke="#FFFFFF" stroke-width="3" 
+        fill="#FFFFFF" stroke="#000000" stroke-width="2" 
         text-anchor="middle" filter="url(#shadow)">0</text>
   
   <!-- Small corner numbers -->
-  <text x="30" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
-        fill="#FFFFFF" text-anchor="middle">0</text>
-  <text x="170" y="285" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
-        fill="#FFFFFF" text-anchor="middle" transform="rotate(180 170 270)">0</text>
+  <text x="25" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" stroke="#000000" stroke-width="1" text-anchor="start">0</text>
+  <text x="25" y="45" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
+        fill="#FFFFFF" stroke="#000000" stroke-width="1" text-anchor="start" transform="rotate(180 100 150)">0</text>
 </svg>

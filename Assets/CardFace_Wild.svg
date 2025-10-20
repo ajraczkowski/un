@@ -14,9 +14,6 @@
   
   <!-- Four colored quadrants in a circle -->
   <defs>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#FFFFFF" flood-opacity="0.3"/>
-    </filter>
     <clipPath id="topLeft">
       <path d="M 100 150 L 100 100 A 50 50 0 0 1 135.355 114.645 Z"/>
     </clipPath>
@@ -31,7 +28,7 @@
     </clipPath>
   </defs>
   
-  <g filter="url(#shadow)">
+  <g>
     <!-- Outer circle border -->
     <circle cx="100" cy="150" r="50" fill="none" stroke="#FFFFFF" stroke-width="4"/>
     
@@ -53,7 +50,7 @@
   
   <!-- "WILD" text -->
   <text x="100" y="230" font-family="Arial, sans-serif" font-size="36" font-weight="bold" 
-        fill="#FFFFFF" text-anchor="middle" filter="url(#shadow)">WILD</text>
+        fill="#FFFFFF" text-anchor="middle">WILD</text>
   
   <!-- Corner wild symbols (smaller four-color circles) -->
   <g>
